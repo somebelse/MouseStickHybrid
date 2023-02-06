@@ -1,0 +1,13 @@
+- find more feature improvements
+
+- option for edgepush to be angle independent
+- option to make edge-push curve disable regular analog curve
+- derivative term
+- polynomial curves
+- improve smoothing
+
+
+- rewrite code using tuples and functions
+- UI to change and test parameters
+	- Parameter presets
+	- Parameter save file
