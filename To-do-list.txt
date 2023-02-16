@@ -1,5 +1,3 @@
-- URGENT: fix edge push behavior
-
 - find more feature improvements
 
 - make the clipping of the return speed after edge push stay even after inner deadzone until 0 is crossed or speed is outward
