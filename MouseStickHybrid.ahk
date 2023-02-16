@@ -1,30 +1,32 @@
 ﻿; Mouse Stick Hybrid Aim (Name WiP)
 ; Proof of Concept by Morten Ramcke
 ; Copyright CC0 - no copyright
-; version 0.04 2023-02-05
+; version 0.6 2023-02-16
+
+; EDGE PUSH CURRENTLY BROKEN
+
 ; changes:
-;   added more control over push direction
-;   separated inner_deadzones for joystick behavior and push behavior (if in doubt make them the same)
+;   -radial multiplier improvements
+;   -retry search for Joystick (usefull for GlosSI as it takes some time to create a virtual one)
 
 ; parameters
-global_factor := 3                  ;2
+global_factor := 1                  ;2
 
 mouse_factor := 1                   ;1
 quadratic_acceleration := 0         ;0
 
-joystick_factor := 1                ; 1
-joystick_linearity := 1             ; 3
+joystick_factor := 0                ; 1
+joystick_linearity := 1.5           ; 3
 
-radial_modulation_factor := 0       ; local radial speed factor depending on stick position and radial delta. (feels bad with current implementation. PLEASE EXPERIMENT
-radial_exponent_factor := 0.5       ; how much outward movement is increased and inward reduced
+radial_multiplier := 1.5            ; local radial speed factor depending on stick position
 radial_linearity := 1               ; 1
 
-inner_deadzone_joy := 3.5           ; 4.5
-outer_deadzone := 49.8              ; 49
-inner_deadzone_push := 3.5          ; 4.5 (keep small to return to center after push)
+inner_deadzone_joy := 4.5           ; 4.5
+outer_deadzone := 48              ; 49
+inner_deadzone_push := 4.5          ; 4.5 (keep small to return to center after push)
 
 edge_push_active := true            ; true
-edge_control_active := true         ; true
+push_angle_independent := false      ; false
 push_linearity := 1                 ; 1.5
 
 smoothing_steps := 3				; 10 (minimum 1)
@@ -34,11 +36,8 @@ dt := 1                             ; 4
 
 ; new
 
-joystick_polynomial := []           ; a1, a2, a3... for f(x)= 0 + a1*x + a2*x^2 + a3*x^3 + ... with x in [0, 1]
-mouse_polynomial := []              ; a1, a2, a3... for f(x)= 0 + a1*x + a2*x^2 + a3*x^3 + ...
 derivative_factor := 0              ; just an idea. negative would delay movement, positive would push it forward
 
-radial_polynomial := []             ; a1, a2, a3... for f(x)= 0 + a1*x + a2*x^2 + a3*x^3 + ... with x in [0, 1]
 
 pause_on_release := false           ; disables output while letting go of the stick. Needs touch sensitive stick to work
 
@@ -46,7 +45,7 @@ pause_on_release := false           ; disables output while letting go of the st
 
 ; Auto-detect the joystick number if called for:
 JoystickNumber := 0
-if JoystickNumber <= 0
+searchForJoystick:
 {
     Loop 16  ; Query each joystick number to find out which ones exist.
     {
@@ -59,7 +58,8 @@ if JoystickNumber <= 0
     if JoystickNumber <= 0
     {
         MsgBox "The system does not appear to have any joysticks."
-        ExitApp
+        sleep 10000
+        goto searchForJoystick
     }
 }
 
@@ -91,10 +91,10 @@ UpdateLoop(){
     prev_deflection_x := deflection_x
     prev_deflection_y := deflection_y
     prev_deflection_distance := deflection_distance
-    deflection_x := GetKeyState(JoystickNumber "JoyU") - stick_center
-    deflection_y := (GetKeyState(JoystickNumber "JoyR") - stick_center)
+    try deflection_x := GetKeyState(JoystickNumber "JoyU") - stick_center
+    try deflection_y := GetKeyState(JoystickNumber "JoyR") - stick_center
     deflection_distance := sqrt(deflection_x * deflection_x + deflection_y * deflection_y)
-    angle := atan2(deflection_y , deflection_x)
+    try angle := atan2(deflection_x , deflection_y)
     dx := deflection_x - prev_deflection_x
     dy := deflection_y - prev_deflection_y
 
@@ -110,34 +110,51 @@ UpdateLoop(){
 	average_dy /= smoothing_steps
 
     distance_delta := sqrt(average_dx * average_dx + average_dy * average_dy)
-    angle_delta := atan2(dy, dx)
+    try angle_delta := atan2(dx, dy)
+
+
+
+
+
+    ; mouse behavior
+    output_x := mouse_factor * (1 + quadratic_acceleration * distance_delta / dt) * dx      ;replaced dx, dy with average_dx, _dy
+    output_y := mouse_factor * (1 + quadratic_acceleration * distance_delta / dt) * dy
+
+
+    ; radial multiplier
+    magnitude_radial := (deflection_distance + prev_deflection_distance)/2 /outer_deadzone) ** radial_linearity
+    if (magnitude_radial > 1){
+        magnitude_radial := 1
+    }
+    factor := (1 + (radial_multiplier - 1) * magnitude_radial) ** cos(angle - angle_delta)
+    output_x *= factor
+    output_y *= factor
+
 
     ; deadzones:
     ; outer
     if (deflection_distance >= outer_deadzone){
         ; entering outer
-        if (prev_deflection_distance < outer_deadzone){
-            has_touched := true
-            angle_touch := angle
-            push_x := (1 + quadratic_acceleration * distance_delta / dt) * distance_delta * cos(angle_delta - angle) * cos(angle)
-            push_y := (1 + quadratic_acceleration * distance_delta / dt) * distance_delta * cos(angle_delta - angle) * sin(angle)
-            push := sqrt(push_x * push_x + push_y * push_y)
-        }
-        if edge_control_active{
+        if edge_push_active{
+            if (prev_deflection_distance < outer_deadzone){
+                has_touched := true
+                push := output_x * cos(angle) + output_y * sin(angle) ; radial compontent BROKEN???
+            }
             angle_touch := angle
             push_x := push * cos(angle)
             push_y := push * sin(angle)
+
+            ; clip radial mouse
+            if (cos(angle_delta - angle) > 0){
+                normal_x := sin(angle)
+                normal_y := - cos(angle)
+                dotProduct := normal_x * output_x + normal_y * output_y
+                output_x := dotProduct * normal_x
+                output_y := dotProduct * normal_y
+                ; Mouse acceleration should stay untouched
+            }
         }
         magnitude := 1
-        ; clip radial delta
-        if (cos(angle_delta - angle) > 0){
-            normal_x := sin(angle)
-            normal_y := - cos(angle)
-            dotProduct := normal_x * dx + normal_y * dy
-            dx := dotProduct * normal_x
-            dy := dotProduct * normal_y
-            ; Mouse acceleration should stay untouched
-        }
     }else{
         ; inner (Joystick)
         if (deflection_distance < inner_deadzone_joy){
@@ -149,20 +166,6 @@ UpdateLoop(){
 
     }
 
-    ; mouse behavior
-    output_x := mouse_factor * (1 + quadratic_acceleration * distance_delta / dt) * average_dx      ;replaced dx, dy with average_dx, _dy
-    output_y := mouse_factor * (1 + quadratic_acceleration * distance_delta / dt) * average_dy
-
-    ; radial modulation behavior HIGHLY WIP
-    dotProduct := average_dx * cos(angle) + average_dy * sin(angle)
-    radial_dx := dotProduct * cos(angle)
-    radial_dy := dotProduct * sin(angle)
-    magnitude_radial := magnitude ** radial_linearity
-
-    output_x += radial_modulation_factor * 2 ** (radial_exponent_factor * dotProduct/dt) * magnitude_radial * radial_dx
-    output_y += radial_modulation_factor * 2 ** (radial_exponent_factor * dotProduct/dt) * magnitude_radial * radial_dy
-
-
     ; joystick behavior
     magnitude_joy := magnitude ** joystick_linearity
     magnitude_x := magnitude_joy * cos(angle)
@@ -172,7 +175,14 @@ UpdateLoop(){
 
     ; edge touch push
     if (has_touched and edge_push_active){
-        deflection_touch_axis := deflection_distance * cos(angle - angle_touch)
+        if push_angle_independent{
+            deflection_touch_axis := deflection_distance
+            push_x := push * cos(angle)
+            push_y := push * sin(angle)
+        }else{
+            deflection_touch_axis := deflection_distance * cos(angle - angle_touch)
+        }
+
         if (deflection_touch_axis < inner_deadzone_push){
             has_touched := false
         }else{
@@ -229,6 +239,6 @@ vec_circular("float", x, "float", y, "float", theta){
     return circular_x, circular_y
 */
 
-atan2(y,x) {    ; 4-quadrant atan
-   		Return dllcall("msvcrt\atan2","Double",y, "Double",x, "CDECL Double")
+atan2(x,y) {    ; 4-quadrant atan
+   		Return dllcall("msvcrt\atan2","Double",x , "Double",y , "CDECL Double")
 	}
