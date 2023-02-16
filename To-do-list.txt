@@ -1,13 +1,15 @@
+- URGENT: fix edge push behavior
+
 - find more feature improvements
 
-- option for edgepush to be angle independent
-- option to make edge-push curve disable regular analog curve
-- derivative term
-- polynomial curves
+- make the clipping of the return speed after edge push stay even after inner deadzone until 0 is crossed or speed is outward
+- option to make edge-push temporalily curve disable regular analog curve
+- derivative term?
+- polynomial curves?
 - improve smoothing
 
 
-- rewrite code using tuples and functions
+- rewrite code using objects and functions
 - UI to change and test parameters
 	- Parameter presets
 	- Parameter save file
