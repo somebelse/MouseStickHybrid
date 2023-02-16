@@ -58,7 +58,7 @@ searchForJoystick:
     if JoystickNumber <= 0
     {
         MsgBox "The system does not appear to have any joysticks."
-        sleep 10000
+        sleep 1000
         goto searchForJoystick
     }
 }
@@ -109,7 +109,10 @@ UpdateLoop(){
 	average_dx /= smoothing_steps
 	average_dy /= smoothing_steps
 
-    distance_delta := sqrt(average_dx * average_dx + average_dy * average_dy)
+    dist_delta := sqrt(dx*dx + dy*dy)
+    average_dist_delta:= sqrt(average_dx * average_dx + average_dy * average_dy)
+    try smoothing_factor := average_dist_delta/dist_delta
+
     try angle_delta := atan2(dx, dy)
 
 
@@ -117,8 +120,8 @@ UpdateLoop(){
 
 
     ; mouse behavior
-    output_x := mouse_factor * (1 + quadratic_acceleration * distance_delta / dt) * dx      ;replaced dx, dy with average_dx, _dy
-    output_y := mouse_factor * (1 + quadratic_acceleration * distance_delta / dt) * dy
+    output_x := mouse_factor * (1 + quadratic_acceleration * average_dist_delta/ dt) * dx      ;replaced dx, dy with average_dx, _dy
+    output_y := mouse_factor * (1 + quadratic_acceleration * average_dist_delta/ dt) * dy
 
 
     ; radial multiplier
@@ -139,6 +142,7 @@ UpdateLoop(){
             if (prev_deflection_distance < outer_deadzone){
                 has_touched := true
                 push := output_x * cos(angle) + output_y * sin(angle) ; radial compontent BROKEN???
+                push *= smoothing_factor
             }
             angle_touch := angle
             push_x := push * cos(angle)
@@ -219,25 +223,6 @@ UpdateLoop(){
 	}
 
 }
-
-/*
-vec_radial("float", x, "float", y, "float", theta){
-    unitVec_x := cos(theta)
-    unitVec_y := sin(theta)
-    dotProduct := x * unitVec_x + y * unitVec_y
-    radial_x := dotProduct * unitVec_x
-    radial_y := dotProduct * unitVec_y
-    return radial_x, radial_y
-}
-
-vec_circular("float", x, "float", y, "float", theta){
-    unitVec_x := - sin(theta)
-    unitVec_y := cos(theta)
-    dotProduct := x * unitVec_x + y * unitVec_y
-    circular_x := dotProduct * unitVec_x
-    circular_y := dotProduct * unitVec_y
-    return circular_x, circular_y
-*/
 
 atan2(x,y) {    ; 4-quadrant atan
    		Return dllcall("msvcrt\atan2","Double",x , "Double",y , "CDECL Double")
