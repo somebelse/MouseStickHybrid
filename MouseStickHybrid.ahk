@@ -22,7 +22,7 @@ radial_multiplier := 1.5            ; local radial speed factor depending on sti
 radial_linearity := 1               ; 1
 
 inner_deadzone_joy := 4.5           ; 4.5
-outer_deadzone := 48              ; 49
+outer_deadzone := 49              ; 49
 inner_deadzone_push := 4.5          ; 4.5 (keep small to return to center after push)
 
 edge_push_active := true            ; true
@@ -148,6 +148,7 @@ UpdateLoop(){
             push_x := push * cos(angle)
             push_y := push * sin(angle)
 
+            /*
             ; clip radial mouse
             if (cos(angle_delta - angle) > 0){
                 normal_x := sin(angle)
@@ -157,6 +158,7 @@ UpdateLoop(){
                 output_y := dotProduct * normal_y
                 ; Mouse acceleration should stay untouched
             }
+            */
         }
         magnitude := 1
     }else{
@@ -225,5 +227,5 @@ UpdateLoop(){
 }
 
 atan2(x,y) {    ; 4-quadrant atan
-   		Return dllcall("msvcrt\atan2","Double",x , "Double",y , "CDECL Double")
+   		Return dllcall("msvcrt\atan2","Double",y , "Double",x , "CDECL Double")
 	}
