@@ -122,7 +122,7 @@ UpdateLoop(){
 
 
     ; radial multiplier
-    magnitude_radial := (deflection_distance + prev_deflection_distance)/2 /outer_deadzone) ** radial_linearity
+    magnitude_radial := ((deflection_distance + prev_deflection_distance)/2 /outer_deadzone) ** radial_linearity
     if (magnitude_radial > 1){
         magnitude_radial := 1
     }
